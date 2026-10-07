@@ -45,3 +45,39 @@ def test_duplicate_active_job_is_blocked(tmp_path: Path):
 
     with pytest.raises(DuplicateJobError):
         orch.enqueue(Job(workflow=kind, payload=payload), force=True)
+
+
+def test_irreversible_failure_requires_review(tmp_path: Path):
+    from workflow_ai.domain.models import StepResult
+
+    class Connector:
+        kind = WorkflowKind.PORTAL_A_SUBMISSION
+
+        def run_step(self, step_name, job):
+            if step_name == "submit":
+                return StepResult(ok=False, message="confirmação não observada")
+            return StepResult(ok=True)
+
+    repo = SQLiteJobRepository(str(tmp_path / "uncertain.db"))
+    kind = WorkflowKind.PORTAL_A_SUBMISSION
+    orch = Orchestrator(
+        repo,
+        {kind: Connector()},
+        approval_required=False,
+    )
+    job = orch.enqueue(
+        Job(
+            workflow=kind,
+            payload=CaseRecord(
+                process_id="P1",
+                commitment_number="NE1",
+                supplier_document="123",
+            ),
+        )
+    )
+
+    result = orch.execute(job)
+
+    assert result.status == JobStatus.NEEDS_REVIEW
+    assert result.current_step == "submit"
+    assert "revisão humana" in result.error
