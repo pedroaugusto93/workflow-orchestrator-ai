@@ -1,18 +1,26 @@
-# Private connector pack
+# Optional private connector overrides
 
-Esta pasta é ignorada pelo Git e deve existir somente no ambiente operacional.
+Os conectores oficiais do projeto ficam publicamente em:
 
-Contrato mínimo em `private_connectors/__init__.py`:
+- `src/workflow_ai/connectors/portal_a/`
+- `src/workflow_ai/connectors/portal_b/`
+
+Esta pasta existe somente para um ambiente que precise **substituir** um conector
+sem modificar o código público.
+
+Contrato opcional em `private_connectors/__init__.py`:
 
 ```python
 from workflow_ai.domain.models import WorkflowKind
 
 def build_connectors():
     return {
-        WorkflowKind.PORTAL_A_SUBMISSION: PortalAConnector(...),
-        WorkflowKind.PORTAL_B_PUBLICATION: PortalBConnector(...),
+        WorkflowKind.PORTAL_A_SUBMISSION: MeuConectorA(...),
+        WorkflowKind.PORTAL_B_PUBLICATION: MeuConectorB(...),
     }
 ```
 
-Migre para cá a lógica Selenium específica dos dois projetos antigos. URLs, seletores,
-textos institucionais, certificados, caminhos e dados reais não devem ser commitados.
+Não coloque aqui planilhas, documentos, certificados ou dados reais. Como a pasta é
+ignorada pelo Git, ela pode conter código/configuração estritamente local quando isso
+for necessário, mas o caminho preferencial é manter segredos e valores operacionais
+em variáveis de ambiente.
