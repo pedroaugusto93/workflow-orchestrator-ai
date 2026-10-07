@@ -159,6 +159,23 @@ def _apply_agent_state(job_id: str, body: AgentState) -> None:
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
 
+    if job.status in {
+        JobStatus.NEEDS_REVIEW,
+        JobStatus.SUCCEEDED,
+        JobStatus.CANCELLED,
+    }:
+        raise HTTPException(
+            status_code=409,
+            detail="Estado terminal/bloqueado não pode ser alterado pelo agente.",
+        )
+
+    if job.status == JobStatus.WAITING_APPROVAL and not job.approved:
+        if body.status != JobStatus.WAITING_APPROVAL:
+            raise HTTPException(
+                status_code=409,
+                detail="Job aguardando aprovação não pode voltar a executar.",
+            )
+
     if (
         body.current_step
         and _is_irreversible(job, body.current_step)
@@ -204,6 +221,15 @@ def agent_step(job_id: str, body: AgentStep, request: Request):
     job = repo.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
+    if job.status in {
+        JobStatus.NEEDS_REVIEW,
+        JobStatus.SUCCEEDED,
+        JobStatus.CANCELLED,
+    }:
+        raise HTTPException(
+            status_code=409,
+            detail="Job bloqueado/terminal não aceita novos steps do agente.",
+        )
     if (
         _is_irreversible(job, body.step_name)
         and body.status in {StepStatus.RUNNING, StepStatus.SUCCEEDED}
