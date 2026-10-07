@@ -168,7 +168,7 @@ class SQLiteJobRepository:
 
     @staticmethod
     def _row_to_job(row: sqlite3.Row) -> Job:
-        payload = CaseRecord(**json.loads(row["payload_json"]))
+        payload = CaseRecord.from_dict(json.loads(row["payload_json"]))
         return Job(
             id=row["id"],
             workflow=WorkflowKind(row["workflow"]),

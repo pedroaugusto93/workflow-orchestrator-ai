@@ -4,6 +4,7 @@ import importlib
 from dataclasses import dataclass
 
 from workflow_ai.connectors.portal_a import PortalAConfig, PortalAConnector
+from workflow_ai.connectors.portal_b import PortalBConfig, PortalBConnector
 from workflow_ai.domain.models import Job, StepResult, WorkflowKind
 from workflow_ai.infrastructure.settings import settings
 from workflow_ai.ports.connectors import PortalConnector
@@ -29,26 +30,29 @@ def load_private_connectors(package_name: str) -> dict[WorkflowKind, PortalConne
     builder = getattr(module, "build_connectors", None)
     if not callable(builder):
         return {}
-    return builder()
+    return dict(builder())
 
 
 def build_connector_registry(package_name: str, *, development: bool = False):
-    """Build connectors only on the local execution agent.
-
-    The hosted API does not need browser connectors to enqueue jobs.
-    """
     connectors = load_private_connectors(package_name)
-    if connectors:
-        return connectors
-
     portal_a = PortalAConfig()
-    if portal_a.create_url:
-        from workflow_ai.infrastructure.browser import attach_to_chrome
-        from workflow_ai.infrastructure.selenium_browser import SeleniumBrowser
+    portal_b = PortalBConfig()
+    browser = None
 
-        driver = attach_to_chrome(settings.chrome_debug_host, settings.chrome_debug_port)
-        browser = SeleniumBrowser(driver)
-        connectors[WorkflowKind.PORTAL_A_SUBMISSION] = PortalAConnector(browser, portal_a)
+    def get_browser():
+        nonlocal browser
+        if browser is None:
+            from workflow_ai.infrastructure.browser import attach_to_chrome
+            from workflow_ai.infrastructure.selenium_browser import SeleniumBrowser
+
+            driver = attach_to_chrome(settings.chrome_debug_host, settings.chrome_debug_port)
+            browser = SeleniumBrowser(driver)
+        return browser
+
+    if portal_a.create_url and WorkflowKind.PORTAL_A_SUBMISSION not in connectors:
+        connectors[WorkflowKind.PORTAL_A_SUBMISSION] = PortalAConnector(get_browser(), portal_a)
+    if portal_b.target_url and WorkflowKind.PORTAL_B_PUBLICATION not in connectors:
+        connectors[WorkflowKind.PORTAL_B_PUBLICATION] = PortalBConnector(get_browser(), portal_b)
 
     if development and WorkflowKind.PORTAL_A_SUBMISSION not in connectors:
         connectors[WorkflowKind.PORTAL_A_SUBMISSION] = DemoConnector(WorkflowKind.PORTAL_A_SUBMISSION)

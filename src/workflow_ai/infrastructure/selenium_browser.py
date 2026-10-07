@@ -132,6 +132,14 @@ class SeleniumBrowser(BrowserPort):
         el = self._wait(timeout).until(EC.presence_of_element_located(self._tuple(locator)))
         return (el.get_attribute("value") or "").strip()
 
+    def read_text(self, locator: Locator, *, timeout: float | None = None) -> str:
+        el = self._wait(timeout).until(EC.presence_of_element_located(self._tuple(locator)))
+        return (el.text or "").strip()
+
+    def read_attribute(self, locator: Locator, name: str, *, timeout: float | None = None) -> str:
+        el = self._wait(timeout).until(EC.presence_of_element_located(self._tuple(locator)))
+        return (el.get_attribute(name) or "").strip()
+
     def exists(self, locator: Locator, *, timeout: float = 2.0) -> bool:
         try:
             self._wait(timeout).until(EC.presence_of_element_located(self._tuple(locator)))
@@ -147,6 +155,17 @@ class SeleniumBrowser(BrowserPort):
         if not file_path.is_file():
             raise FileNotFoundError(file_path)
         el = self._wait(timeout).until(EC.presence_of_element_located(self._tuple(locator)))
+        try:
+            self.driver.execute_script(
+                "arguments[0].removeAttribute('hidden');"
+                "arguments[0].removeAttribute('disabled');"
+                "arguments[0].style.display='block';"
+                "arguments[0].style.visibility='visible';"
+                "arguments[0].style.opacity='1';",
+                el,
+            )
+        except Exception:
+            pass
         el.send_keys(str(file_path))
 
     def confirm(self, labels: Sequence[str], *, timeout: float = 5.0) -> bool:
