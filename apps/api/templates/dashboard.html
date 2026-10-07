@@ -42,7 +42,20 @@
           <div class="job-side">
             <span class="status status-{{ job.status.value }}">{{ job.status.value }}</span>
             {% if job.status.value == 'waiting_approval' %}
-            <form method="post" action="/jobs/{{ job.id }}/approve"><button class="secondary">Aprovar</button></form>
+            <form method="post" action="/jobs/{{ job.id }}/approve">
+              <button class="secondary">Aprovar</button>
+            </form>
+            {% elif job.status.value == 'needs_review' %}
+            <form method="post" action="/jobs/{{ job.id }}/review"
+                  onsubmit="return confirm('Confirme somente após verificar no portal que a ação foi concluída.')">
+              <input type="hidden" name="decision" value="completed">
+              <button class="secondary">Confirmar concluído</button>
+            </form>
+            <form method="post" action="/jobs/{{ job.id }}/review"
+                  onsubmit="return confirm('Use apenas após verificar no portal que a ação NÃO ocorreu. Uma nova aprovação será exigida.')">
+              <input type="hidden" name="decision" value="retry">
+              <button class="secondary">Tentar novamente</button>
+            </form>
             {% endif %}
           </div>
           {% if job.error %}<p class="error">{{ job.error }}</p>{% endif %}
