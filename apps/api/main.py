@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import secrets
-from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
@@ -12,7 +11,8 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from workflow_ai.application.orchestrator import DuplicateJobError, Orchestrator
-from workflow_ai.domain.models import CaseRecord, Job, JobStatus, WorkflowKind
+from workflow_ai.domain.models import CaseRecord, Job, JobStatus, StepStatus, WorkflowKind
+from workflow_ai.infrastructure.serialization import job_to_dict
 from workflow_ai.infrastructure.settings import settings
 from workflow_ai.infrastructure.sqlite_repo import SQLiteJobRepository
 
@@ -115,19 +115,32 @@ def approve_job(job_id: str, _: str = Depends(require_user)):
 def agent_next(request: Request, agent_id: str):
     require_agent(request)
     job = repo.claim_next(agent_id)
-    return {"job": _serialize(job) if job else None}
+    return {"job": job_to_dict(job) if job else None}
 
 
-class AgentResult(BaseModel):
+@app.get("/api/agent/jobs/{job_id}")
+def agent_get_job(job_id: str, request: Request):
+    require_agent(request)
+    job = repo.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+    return {"job": job_to_dict(job)}
+
+
+class AgentState(BaseModel):
     status: JobStatus
     current_step: str = ""
     external_id: str = ""
     error: str = ""
 
 
-@app.post("/api/agent/jobs/{job_id}/result")
-def agent_result(job_id: str, body: AgentResult, request: Request):
-    require_agent(request)
+class AgentStep(BaseModel):
+    step_name: str
+    status: StepStatus
+    message: str = ""
+
+
+def _apply_agent_state(job_id: str, body: AgentState) -> None:
     job = repo.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
@@ -136,23 +149,54 @@ def agent_result(job_id: str, body: AgentResult, request: Request):
     job.external_id = body.external_id
     job.error = body.error
     repo.update(job)
+
+
+@app.post("/api/agent/jobs/{job_id}/state")
+def agent_state(job_id: str, body: AgentState, request: Request):
+    require_agent(request)
+    _apply_agent_state(job_id, body)
     return {"ok": True}
 
 
-def _serialize(job: Job | None):
-    if job is None:
-        return None
-    data = asdict(job)
-    data["workflow"] = job.workflow.value
-    data["status"] = job.status.value
-    data["created_at"] = job.created_at.isoformat()
-    data["updated_at"] = job.updated_at.isoformat()
-    return data
+@app.post("/api/agent/jobs/{job_id}/result")
+def agent_result(job_id: str, body: AgentState, request: Request):
+    """Backward-compatible alias for older agents."""
+    require_agent(request)
+    _apply_agent_state(job_id, body)
+    return {"ok": True}
+
+
+@app.post("/api/agent/jobs/{job_id}/steps")
+def agent_step(job_id: str, body: AgentStep, request: Request):
+    require_agent(request)
+    if not repo.get(job_id):
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+    repo.record_step(
+        job_id,
+        body.step_name,
+        body.status,
+        body.message,
+    )
+    return {"ok": True}
+
+
+@app.get("/api/agent/jobs/{job_id}/completed-steps")
+def agent_completed_steps(job_id: str, request: Request):
+    require_agent(request)
+    if not repo.get(job_id):
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+    return {"steps": sorted(repo.completed_steps(job_id))}
 
 
 def main() -> None:
     import uvicorn
-    uvicorn.run("apps.api.main:app", host=settings.app_host, port=settings.app_port, reload=False)
+
+    uvicorn.run(
+        "apps.api.main:app",
+        host=settings.app_host,
+        port=settings.app_port,
+        reload=False,
+    )
 
 
 if __name__ == "__main__":
