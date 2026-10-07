@@ -13,12 +13,11 @@ class Settings(BaseSettings):
     app_password: str = "change-me"
     app_access_token: str = "change-me"
     agent_token: str = "change-me-agent"
+    agent_api_url: str = ""
     database_url: str = "sqlite:///./data/app.db"
     approval_required: bool = True
     allow_force_reprocess: bool = False
     connector_package: str = "private_connectors"
-    portal_a_url: str = ""
-    portal_b_url: str = ""
     chrome_debug_host: str = "127.0.0.1"
     chrome_debug_port: int = 9222
     poll_interval_seconds: int = 5
