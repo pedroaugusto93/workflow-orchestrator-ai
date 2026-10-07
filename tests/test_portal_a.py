@@ -1,13 +1,15 @@
 from pathlib import Path
 
 from workflow_ai.connectors.portal_a.config import PortalAConfig
-from workflow_ai.connectors.portal_a.steps import PortalASteps, _date_br, _money
+from workflow_ai.connectors.portal_a.steps import PortalASteps, _date_br, _money, _money_cents
 from workflow_ai.domain.models import CaseRecord
 
 
 def test_money_and_date_normalization():
     assert _money("1234,5", 2) == "1.234,50"
     assert _money("1234.5", 4) == "1.234,5000"
+    assert _money_cents("100") == _money_cents("100,00")
+    assert _money_cents("R$ 1.234,56") == "123456"
     assert _date_br("2026-06-15 00:00:00") == "15/06/2026"
 
 
