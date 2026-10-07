@@ -49,3 +49,9 @@ def test_lost_context_fails_safe():
 
     assert not result.ok
     assert "não pôde ser restaurado" in result.message
+
+
+def test_portal_a_config_reads_environment(monkeypatch):
+    monkeypatch.setenv("PORTAL_A_CREATE_URL", "https://example.test/create")
+    cfg = PortalAConfig()
+    assert cfg.create_url == "https://example.test/create"
