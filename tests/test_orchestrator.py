@@ -81,3 +81,45 @@ def test_irreversible_failure_requires_review(tmp_path: Path):
     assert result.status == JobStatus.NEEDS_REVIEW
     assert result.current_step == "submit"
     assert "revisão humana" in result.error
+
+
+def test_review_resolution_can_confirm_completion(tmp_path: Path):
+    repo = SQLiteJobRepository(str(tmp_path / "review-complete.db"))
+    kind = WorkflowKind.PORTAL_A_SUBMISSION
+    orch = Orchestrator(repo, {})
+    job = repo.create(
+        Job(
+            workflow=kind,
+            payload=CaseRecord(process_id="P1"),
+            status=JobStatus.NEEDS_REVIEW,
+            current_step="submit",
+            approved=True,
+        )
+    )
+
+    resolved = orch.resolve_review(job.id, completed=True)
+
+    assert resolved.status == JobStatus.SUCCEEDED
+    assert resolved.current_step == ""
+    assert "submit" in repo.completed_steps(job.id)
+
+
+def test_review_retry_requires_new_approval(tmp_path: Path):
+    repo = SQLiteJobRepository(str(tmp_path / "review-retry.db"))
+    kind = WorkflowKind.PORTAL_B_PUBLICATION
+    orch = Orchestrator(repo, {})
+    job = repo.create(
+        Job(
+            workflow=kind,
+            payload=CaseRecord(process_id="P1"),
+            status=JobStatus.NEEDS_REVIEW,
+            current_step="publish",
+            approved=True,
+        )
+    )
+
+    resolved = orch.resolve_review(job.id, completed=False)
+
+    assert resolved.status == JobStatus.QUEUED
+    assert resolved.approved is False
+    assert resolved.current_step == ""
