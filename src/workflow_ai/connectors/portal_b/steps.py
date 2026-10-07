@@ -23,6 +23,17 @@ def _date_br(value: str) -> str:
     return raw
 
 
+def _date_input(value: str, *, month_first: bool) -> str:
+    normalized = _date_br(value)
+    if not normalized:
+        return ""
+    try:
+        parsed = datetime.strptime(normalized, "%d/%m/%Y")
+    except ValueError:
+        return normalized
+    return parsed.strftime("%m/%d/%Y" if month_first else "%d/%m/%Y")
+
+
 def _year(value: str) -> str:
     normalized = _date_br(value)
     match = re.search(r"(\d{4})$", normalized)
@@ -85,8 +96,25 @@ class PortalBSteps:
         self.browser.click(B.CREATE)
         self.browser.fill(B.TITLE, record.title)
         self._select_option(B.CATEGORY, self.config.category_label)
-        self.browser.fill(B.START_DATE, _date_br(record.start_date))
-        self.browser.fill(B.END_DATE, _date_br(record.end_date or record.commitment_date))
+
+        language = str(
+            self.browser.execute_script(
+                "return navigator.language || navigator.userLanguage || 'pt-BR';"
+            )
+            or ""
+        ).lower()
+        month_first = language.startswith("en")
+        self.browser.fill(
+            B.START_DATE,
+            _date_input(record.start_date, month_first=month_first),
+        )
+        self.browser.fill(
+            B.END_DATE,
+            _date_input(
+                record.end_date or record.commitment_date,
+                month_first=month_first,
+            ),
+        )
         self.browser.fill(B.DESCRIPTION, record.object_text)
         self.browser.fill(B.JUSTIFICATION, self.config.justification)
         self.browser.click(B.SAVE_INITIAL)
