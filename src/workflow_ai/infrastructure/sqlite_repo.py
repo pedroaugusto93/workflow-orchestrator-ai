@@ -76,13 +76,22 @@ class SQLiteJobRepository:
             ).fetchall()
         return [self._row_to_job(row) for row in rows]
 
-    def find_completed_by_idempotency(self, key: str) -> Job | None:
+    def find_existing_by_idempotency(self, key: str) -> Job | None:
+        """Return a succeeded or active equivalent job.
+
+        Failed/cancelled jobs do not block a clean retry with a new job id.
+        """
         with self._connect() as conn:
             row = conn.execute(
                 """SELECT * FROM jobs
-                WHERE idempotency_key = ? AND status = ?
+                WHERE idempotency_key = ?
+                  AND status NOT IN (?, ?)
                 ORDER BY updated_at DESC LIMIT 1""",
-                (key, JobStatus.SUCCEEDED.value),
+                (
+                    key,
+                    JobStatus.FAILED.value,
+                    JobStatus.CANCELLED.value,
+                ),
             ).fetchone()
         return self._row_to_job(row) if row else None
 
