@@ -15,6 +15,27 @@ def _digits(value: str) -> str:
     return re.sub(r"\D", "", str(value or ""))
 
 
+def _money_cents(value: str) -> str:
+    """Normalize a displayed monetary value to cents for read-back comparison."""
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+
+    last_comma = raw.rfind(",")
+    last_dot = raw.rfind(".")
+    separator = max(last_comma, last_dot)
+
+    if separator >= 0:
+        integer = re.sub(r"\D", "", raw[:separator]) or "0"
+        fraction = re.sub(r"\D", "", raw[separator + 1 :])
+        fraction = (fraction + "00")[:2] if fraction else "00"
+        normalized = integer + fraction
+    else:
+        normalized = (re.sub(r"\D", "", raw) or "0") + "00"
+
+    return normalized.lstrip("0") or "0"
+
+
 def _alnum(value: str) -> str:
     return "".join(ch for ch in str(value or "") if ch.isalnum()).upper()
 
@@ -228,7 +249,7 @@ class PortalASteps:
         item = self.browser.last_row_cells(A.ITEM_GRID)
         if not item:
             errors.append("item ausente")
-        elif len(item) > 6 and _digits(item[6]) != _digits(_money(record.value, 2)):
+        elif len(item) > 6 and _money_cents(item[6]) != _money_cents(record.value):
             errors.append("valor do item divergente")
 
         if record.file_path:
@@ -242,7 +263,9 @@ class PortalASteps:
         elif len(commitment) > 5:
             if _alnum(commitment[4]) != _alnum(record.commitment_number):
                 errors.append("número do empenho divergente")
-            if _digits(commitment[5]) != _digits(_money(record.commitment_value or record.value, 2)):
+            if _money_cents(commitment[5]) != _money_cents(
+                record.commitment_value or record.value
+            ):
                 errors.append("valor do empenho divergente")
 
         if errors:
