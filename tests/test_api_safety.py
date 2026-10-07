@@ -78,3 +78,30 @@ def test_human_approval_only_accepts_waiting_jobs(tmp_path, monkeypatch):
 
     assert response.status_code == 409
     assert repo.get(job.id).status == JobStatus.NEEDS_REVIEW
+
+
+def test_agent_cannot_mutate_needs_review_job(tmp_path, monkeypatch):
+    client, repo = _client_with_repo(tmp_path, monkeypatch)
+    job = repo.create(
+        Job(
+            workflow=WorkflowKind.PORTAL_A_SUBMISSION,
+            payload=CaseRecord(process_id="P1"),
+            status=JobStatus.NEEDS_REVIEW,
+            approved=True,
+        )
+    )
+    headers = {"X-Agent-Token": api.settings.agent_token}
+
+    response = client.post(
+        f"/api/agent/jobs/{job.id}/state",
+        headers=headers,
+        json={
+            "status": "running",
+            "current_step": "submit",
+            "external_id": "",
+            "error": "",
+        },
+    )
+
+    assert response.status_code == 409
+    assert repo.get(job.id).status == JobStatus.NEEDS_REVIEW
