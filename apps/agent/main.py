@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import socket
 import time
-from typing import Any
-
 from workflow_ai.application.orchestrator import Orchestrator
 from workflow_ai.domain.models import JobStatus
 from workflow_ai.infrastructure.connectors import build_connector_registry
