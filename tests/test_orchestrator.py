@@ -21,3 +21,27 @@ def test_resume_waits_for_approval(tmp_path: Path):
     approved = repo.get(job.id)
     result = orch.execute(approved)
     assert result.status == JobStatus.SUCCEEDED
+
+
+def test_duplicate_active_job_is_blocked(tmp_path: Path):
+    import pytest
+
+    from workflow_ai.application.orchestrator import DuplicateJobError
+
+    repo = SQLiteJobRepository(str(tmp_path / "duplicate.db"))
+    kind = WorkflowKind.PORTAL_A_SUBMISSION
+    orch = Orchestrator(
+        repo,
+        {kind: DemoConnector(kind)},
+        allow_force_reprocess=True,
+    )
+    payload = CaseRecord(
+        process_id="P1",
+        commitment_number="NE1",
+        supplier_document="123",
+    )
+
+    orch.enqueue(Job(workflow=kind, payload=payload))
+
+    with pytest.raises(DuplicateJobError):
+        orch.enqueue(Job(workflow=kind, payload=payload), force=True)
