@@ -1,29 +1,59 @@
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
 from pathlib import Path
 
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-@dataclass(frozen=True, slots=True)
-class PortalBConfig:
-    target_url: str = os.getenv("PORTAL_B_URL", "")
-    justification: str = os.getenv("PORTAL_B_JUSTIFICATION", "")
-    category_label: str = os.getenv("PORTAL_B_CATEGORY", "Serviços")
-    contract_type_label: str = os.getenv("PORTAL_B_CONTRACT_TYPE", "Dispensa de licitação")
-    dispute_mode_label: str = os.getenv("PORTAL_B_DISPUTE_MODE", "Não se aplica")
-    legal_law_label: str = os.getenv("PORTAL_B_LEGAL_LAW", "LEI 14.133/2021")
-    legal_article_label: str = os.getenv("PORTAL_B_LEGAL_ARTICLE", "Art. 75")
-    legal_clause_prefix: str = os.getenv("PORTAL_B_LEGAL_CLAUSE_PREFIX", "Inciso II:")
-    pca_status: str = os.getenv("PORTAL_B_PCA_STATUS", "Em Execução")
-    catalog_code: str = os.getenv("PORTAL_B_CATALOG_CODE", "")
-    catalog_text: str = os.getenv("PORTAL_B_CATALOG_TEXT", "")
-    resource_label: str = os.getenv("PORTAL_B_RESOURCE_LABEL", "Estadual")
-    attachment_type_label: str = os.getenv(
-        "PORTAL_B_ATTACHMENT_TYPE", "Ato que autoriza a Contratação Direta"
+
+class PortalBConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="PORTAL_B_",
+        populate_by_name=True,
+        extra="ignore",
     )
-    responsible_role_label: str = os.getenv(
-        "PORTAL_B_RESPONSIBLE_ROLE", "Responsável pela contratação direta"
+
+    target_url: str = Field(default="", validation_alias="PORTAL_B_URL")
+    justification: str = ""
+    category_label: str = Field(
+        default="Serviços",
+        validation_alias="PORTAL_B_CATEGORY",
     )
-    authority_role_label: str = os.getenv("PORTAL_B_AUTHORITY_ROLE", "Autoridade competente")
-    receipt_dir: Path = Path(os.getenv("PORTAL_B_RECEIPT_DIR", "./artifacts/receipts_b"))
+    contract_type_label: str = Field(
+        default="Dispensa de licitação",
+        validation_alias="PORTAL_B_CONTRACT_TYPE",
+    )
+    dispute_mode_label: str = Field(
+        default="Não se aplica",
+        validation_alias="PORTAL_B_DISPUTE_MODE",
+    )
+    legal_law_label: str = Field(
+        default="LEI 14.133/2021",
+        validation_alias="PORTAL_B_LEGAL_LAW",
+    )
+    legal_article_label: str = Field(
+        default="Art. 75",
+        validation_alias="PORTAL_B_LEGAL_ARTICLE",
+    )
+    legal_clause_prefix: str = Field(
+        default="Inciso II:",
+        validation_alias="PORTAL_B_LEGAL_CLAUSE_PREFIX",
+    )
+    pca_status: str = "Em Execução"
+    catalog_code: str = ""
+    catalog_text: str = ""
+    resource_label: str = "Estadual"
+    attachment_type_label: str = Field(
+        default="Ato que autoriza a Contratação Direta",
+        validation_alias="PORTAL_B_ATTACHMENT_TYPE",
+    )
+    responsible_role_label: str = Field(
+        default="Responsável pela contratação direta",
+        validation_alias="PORTAL_B_RESPONSIBLE_ROLE",
+    )
+    authority_role_label: str = Field(
+        default="Autoridade competente",
+        validation_alias="PORTAL_B_AUTHORITY_ROLE",
+    )
+    receipt_dir: Path = Path("./artifacts/receipts_b")
