@@ -21,6 +21,17 @@ class PortalAConnector:
     def run_step(self, step_name: str, job: Job) -> StepResult:
         if step_name == "prepare":
             return self.steps.prepare(job.payload, job.external_id)
+
+        if not self.steps.in_edit_context():
+            if not self.steps.restore_edit_context(job.payload, job.external_id):
+                return StepResult(
+                    ok=False,
+                    message=(
+                        "Contexto do Portal A foi perdido e não pôde ser restaurado "
+                        "com segurança. Nenhuma ação desta etapa foi executada."
+                    ),
+                )
+
         handler = getattr(self.steps, step_name, None)
         if not callable(handler):
             return StepResult(ok=False, message=f"Etapa desconhecida: {step_name}")
