@@ -7,45 +7,63 @@ FastAPI nem um portal concreto. Integrações implementam portas bem definidas.
 
 ## Camadas
 
-1. **Domain** — `CaseRecord`, `Job`, estados e chave de idempotência.
-2. **Application** — workflow e `Orchestrator`; decide ordem, retomada e aprovação.
-3. **Ports** — contratos para repositório e conectores.
-4. **Infrastructure** — SQLite, Selenium, settings, carregamento de plug-ins.
-5. **Connectors** — implementação específica de cada portal, fora do repositório público.
+1. **Domain** — `CaseRecord`, `ContractLineItem`, `Job`, estados e idempotência.
+2. **Application** — workflows e `Orchestrator`; decide ordem, retomada e aprovação.
+3. **Ports** — contratos de navegador, repositório e conectores.
+4. **Infrastructure** — SQLite, adaptador Selenium, settings e carregamento de overrides.
+5. **Connectors** — implementações públicas de Portal A e Portal B.
 6. **Apps** — API/painel e agente local.
+
+## Processo como agregado
+
+O processo é a unidade de execução. No fluxo B, várias linhas de planilha tornam-se um
+único `CaseRecord` com uma coleção de `ContractLineItem`.
+
+Isso permite que estado, idempotência e retomada pertençam ao processo, sem depender
+de percentuais gravados em cada linha do Excel.
+
+## Fronteira do navegador
+
+Os conectores dependem de `BrowserPort`, não de `WebDriver` diretamente. O adaptador
+`SeleniumBrowser` concentra espera, clique, preenchimento, upload, leitura de atributos
+e geração de PDF.
+
+## Código público vs. configuração privada
+
+A lógica dos conectores e os seletores genéricos são públicos. Permanecem fora do Git:
+
+- URLs reais do ambiente;
+- credenciais e tokens;
+- certificados;
+- justificativas/textos que identifiquem a organização;
+- planilhas e documentos;
+- códigos locais quando forem sensíveis;
+- logs e evidências de produção.
+
+`private_connectors/` é apenas um mecanismo opcional de override.
 
 ## Por que é melhor que os legados
 
-- `main.py` deixa de concentrar regra de fluxo e tratamento de erro.
+- `main.py` deixa de concentrar fluxo, navegador e estado;
 - progresso deixa de depender da planilha ou de JSON solto;
-- a planilha vira **fonte de importação**, não banco de dados;
-- cada etapa possui estado próprio e pode ser retomada;
+- a planilha vira fonte de importação;
+- cada etapa possui estado persistido e pode ser retomada;
 - ações irreversíveis possuem approval gate;
-- idempotência é transversal aos dois fluxos;
-- conectores de portais não conhecem UI web nem persistência;
+- idempotência é transversal;
+- conectores não conhecem UI web nem persistência;
 - o código público não precisa conhecer o nome da instituição.
 
 ## IA
 
-A IA fica acima dos dados e abaixo das políticas de execução. Usos adequados:
+A IA fica acima dos dados e abaixo das políticas de execução. Pode extrair campos,
+sugerir mapeamentos, apontar inconsistências, explicar falhas e escolher workflows
+conhecidos.
 
-- extrair campos de documentos;
-- sugerir mapeamento de colunas;
-- apontar inconsistências antes da execução;
-- explicar falhas e sugerir correções;
-- escolher um workflow conhecido;
-- gerar um plano que será convertido em passos permitidos.
-
-A IA não pode:
-
-- desativar idempotência;
-- clicar diretamente em publicação/envio irreversível;
-- revelar segredos;
-- inventar campos ausentes;
-- alterar políticas de aprovação.
+A IA não pode desativar idempotência, revelar segredos, inventar campos ausentes,
+alterar políticas de aprovação ou executar livremente ações irreversíveis.
 
 ## Web + agente local
 
-O painel pode ficar hospedado e ser acessado pelo celular. O agente local mantém a sessão
-do navegador, certificado e acesso de rede. Em produção remota, substitua SQLite por
-PostgreSQL e use uma fila transacional/worker dedicado.
+O painel pode ficar hospedado e ser acessado pelo celular. O agente Windows mantém
+sessão autenticada do navegador, certificado e acesso de rede. Em implantação remota,
+o armazenamento compartilhado deve migrar de SQLite para PostgreSQL/fila transacional.
