@@ -51,13 +51,78 @@ class PortalASteps:
     browser: BrowserPort
     config: PortalAConfig
 
+    def in_edit_context(self) -> bool:
+        return self.browser.exists(A.PROCESS, timeout=1.0)
+
+    def restore_edit_context(self, record: CaseRecord, external_id: str) -> bool:
+        """Safely reopen an existing record only when an explicit edit action exists."""
+        if self.in_edit_context():
+            return True
+        if not external_id or not self.config.search_url:
+            return False
+
+        self.browser.navigate(self.config.search_url)
+        self.browser.fill(A.SEARCH_PROCESS, record.process_id)
+        self.browser.click(A.SEARCH_BUTTON)
+        self.browser.page_ready()
+
+        clicked = bool(
+            self.browser.execute_script(
+                r"""
+                const [externalId, processId] = arguments;
+                const canon = value => (value || '')
+                  .normalize('NFD')
+                  .replace(/[\u0300-\u036f]/g, '')
+                  .replace(/[^0-9A-Za-z]/g, '')
+                  .toUpperCase();
+
+                for (const tr of document.querySelectorAll('#datagrid-0 tbody tr')) {
+                  const cells = tr.querySelectorAll('td');
+                  if (!cells[1] || !cells[2]) continue;
+                  if (canon(cells[1].innerText) !== canon(externalId)) continue;
+                  if (canon(cells[2].innerText) !== canon(processId)) continue;
+
+                  const actions = Array.from(
+                    tr.querySelectorAll('td.action button, td.action a')
+                  );
+                  for (const action of actions) {
+                    const semantic = [
+                      action.innerText,
+                      action.getAttribute('title'),
+                      action.getAttribute('aria-label')
+                    ].filter(Boolean).join(' ').toLowerCase();
+
+                    if (/\b(editar|alterar)\b/i.test(semantic)) {
+                      action.click();
+                      return true;
+                    }
+                  }
+                }
+                return false;
+                """,
+                external_id,
+                record.process_id,
+            )
+        )
+        if not clicked:
+            return False
+
+        self.browser.page_ready()
+        return self.browser.exists(A.PROCESS, timeout=8.0)
+
     def prepare(self, record: CaseRecord, external_id: str = "") -> StepResult:
-        if external_id and self.config.search_url:
-            self.browser.navigate(self.config.search_url)
-            self.browser.fill(A.SEARCH_PROCESS, record.process_id)
-            self.browser.click(A.SEARCH_BUTTON)
-            self.browser.page_ready()
-            return StepResult(ok=True, message="Contexto de retomada pesquisado.")
+        if external_id:
+            if self.restore_edit_context(record, external_id):
+                return StepResult(ok=True, message="Contexto existente reaberto com segurança.")
+            return StepResult(
+                ok=False,
+                message=(
+                    "Registro existente localizado como retomada, mas não foi possível "
+                    "confirmar uma ação explícita de Editar/Alterar. Execução interrompida "
+                    "para evitar operar a contratação errada."
+                ),
+            )
+
         self.browser.navigate(self.config.create_url)
         return StepResult(ok=True, message="Tela de novo registro aberta.")
 
