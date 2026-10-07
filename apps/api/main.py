@@ -118,6 +118,24 @@ def approve_job(job_id: str, _: str = Depends(require_user)):
     return RedirectResponse("/", status_code=303)
 
 
+@app.post("/jobs/{job_id}/review")
+def review_job(
+    job_id: str,
+    decision: str = Form(...),
+    _: str = Depends(require_user),
+):
+    if decision not in {"completed", "retry"}:
+        raise HTTPException(status_code=400, detail="Decisão de revisão inválida.")
+    try:
+        orchestrator.resolve_review(
+            job_id,
+            completed=decision == "completed",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return RedirectResponse("/", status_code=303)
+
+
 @app.get("/api/agent/next")
 def agent_next(request: Request, agent_id: str):
     require_agent(request)
