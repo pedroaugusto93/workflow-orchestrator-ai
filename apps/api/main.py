@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from workflow_ai.application.orchestrator import DuplicateJobError, Orchestrator
+from workflow_ai.application.workflows import WORKFLOWS
 from workflow_ai.domain.models import CaseRecord, Job, JobStatus, StepStatus, WorkflowKind
 from workflow_ai.infrastructure.serialization import job_to_dict
 from workflow_ai.infrastructure.settings import settings
@@ -105,9 +106,15 @@ def create_job(
 
 @app.post("/jobs/{job_id}/approve")
 def approve_job(job_id: str, _: str = Depends(require_user)):
-    job = repo.approve(job_id)
-    if not job:
+    existing = repo.get(job_id)
+    if not existing:
         raise HTTPException(status_code=404, detail="Job não encontrado")
+    if existing.status != JobStatus.WAITING_APPROVAL:
+        raise HTTPException(
+            status_code=409,
+            detail="Job não está aguardando aprovação.",
+        )
+    repo.approve(job_id)
     return RedirectResponse("/", status_code=303)
 
 
@@ -140,10 +147,35 @@ class AgentStep(BaseModel):
     message: str = ""
 
 
+def _is_irreversible(job: Job, step_name: str) -> bool:
+    return any(
+        step.name == step_name and step.irreversible
+        for step in WORKFLOWS[job.workflow]
+    )
+
+
 def _apply_agent_state(job_id: str, body: AgentState) -> None:
     job = repo.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
+
+    if (
+        body.current_step
+        and _is_irreversible(job, body.current_step)
+        and body.status in {JobStatus.RUNNING, JobStatus.SUCCEEDED}
+        and not job.approved
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Ação irreversível ainda não foi aprovada.",
+        )
+
+    if body.status == JobStatus.SUCCEEDED and not job.approved:
+        raise HTTPException(
+            status_code=409,
+            detail="Workflow com etapa irreversível não pode concluir sem aprovação.",
+        )
+
     job.status = body.status
     job.current_step = body.current_step
     job.external_id = body.external_id
@@ -169,8 +201,18 @@ def agent_result(job_id: str, body: AgentState, request: Request):
 @app.post("/api/agent/jobs/{job_id}/steps")
 def agent_step(job_id: str, body: AgentStep, request: Request):
     require_agent(request)
-    if not repo.get(job_id):
+    job = repo.get(job_id)
+    if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
+    if (
+        _is_irreversible(job, body.step_name)
+        and body.status in {StepStatus.RUNNING, StepStatus.SUCCEEDED}
+        and not job.approved
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Step irreversível ainda não foi aprovado.",
+        )
     repo.record_step(
         job_id,
         body.step_name,
