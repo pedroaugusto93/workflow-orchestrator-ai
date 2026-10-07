@@ -23,6 +23,7 @@ button.secondary { background: #263246; color: #fff; padding: 8px 12px; }
 .status-succeeded { background: #143522; }
 .status-failed { background: #3a1820; }
 .status-waiting_approval { background: #3a3015; }
+.status-needs_review { background: #4a2417; }
 .error { grid-column: 1 / -1; color: #ffb4b4; margin: 0; font-size: 13px; }
 @media (max-width: 680px) {
   .grid { grid-template-columns: 1fr; }
