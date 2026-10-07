@@ -1,0 +1,109 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from workflow_ai.application.workflows import WORKFLOWS
+from workflow_ai.domain.models import Job, JobStatus, StepStatus, WorkflowKind
+from workflow_ai.ports.connectors import PortalConnector
+from workflow_ai.ports.repositories import JobRepository
+
+
+class DuplicateJobError(RuntimeError):
+    pass
+
+
+class ConnectorNotConfiguredError(RuntimeError):
+    pass
+
+
+class Orchestrator:
+    def __init__(
+        self,
+        repo: JobRepository,
+        connectors: dict[WorkflowKind, PortalConnector],
+        *,
+        approval_required: bool = True,
+        allow_force_reprocess: bool = False,
+    ) -> None:
+        self.repo = repo
+        self.connectors = connectors
+        self.approval_required = approval_required
+        self.allow_force_reprocess = allow_force_reprocess
+
+    def enqueue(self, job: Job, *, force: bool = False) -> Job:
+        previous = self.repo.find_completed_by_idempotency(job.idempotency_key)
+        if previous and not (force and self.allow_force_reprocess):
+            raise DuplicateJobError(
+                f"Registro já concluído por idempotência: {previous.id}"
+            )
+        return self.repo.create(job)
+
+    def execute(self, job: Job) -> Job:
+        connector = self.connectors.get(job.workflow)
+        if connector is None:
+            job.status = JobStatus.FAILED
+            job.error = f"Conector não configurado para {job.workflow.value}"
+            self._touch(job)
+            self.repo.update(job)
+            raise ConnectorNotConfiguredError(job.error)
+
+        completed = self.repo.completed_steps(job.id)
+        job.status = JobStatus.RUNNING
+        self._touch(job)
+        self.repo.update(job)
+
+        for step in WORKFLOWS[job.workflow]:
+            if step.name in completed:
+                continue
+
+            if step.irreversible and self.approval_required and not job.approved:
+                job.status = JobStatus.WAITING_APPROVAL
+                job.current_step = step.name
+                self._touch(job)
+                self.repo.record_step(
+                    job.id, step.name, StepStatus.WAITING_APPROVAL,
+                    "Aguardando aprovação para ação irreversível.",
+                )
+                self.repo.update(job)
+                return job
+
+            job.current_step = step.name
+            self.repo.record_step(job.id, step.name, StepStatus.RUNNING)
+            self._touch(job)
+            self.repo.update(job)
+
+            try:
+                result = connector.run_step(step.name, job.payload)
+            except Exception as exc:
+                job.status = JobStatus.FAILED
+                job.error = f"{type(exc).__name__}: {exc}"
+                self.repo.record_step(job.id, step.name, StepStatus.FAILED, job.error)
+                self._touch(job)
+                self.repo.update(job)
+                return job
+
+            if not result.ok:
+                job.status = JobStatus.FAILED
+                job.error = result.message or f"Falha na etapa {step.name}"
+                self.repo.record_step(job.id, step.name, StepStatus.FAILED, job.error)
+                self._touch(job)
+                self.repo.update(job)
+                return job
+
+            if result.external_id:
+                job.external_id = result.external_id
+
+            self.repo.record_step(
+                job.id, step.name, StepStatus.SUCCEEDED, result.message
+            )
+
+        job.status = JobStatus.SUCCEEDED
+        job.current_step = ""
+        job.error = ""
+        self._touch(job)
+        self.repo.update(job)
+        return job
+
+    @staticmethod
+    def _touch(job: Job) -> None:
+        job.updated_at = datetime.now(timezone.utc)
