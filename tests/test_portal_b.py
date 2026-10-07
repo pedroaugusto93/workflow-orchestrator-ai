@@ -81,3 +81,11 @@ def test_sqlite_roundtrip_preserves_multiple_items(tmp_path: Path):
     assert len(loaded.payload.items) == 2
     assert loaded.payload.items[0].supplier_name == "Fornecedor 1"
     assert loaded.payload.items[1].value == "20"
+
+
+def test_portal_b_config_reads_environment(monkeypatch):
+    monkeypatch.setenv("PORTAL_B_URL", "https://example.test/portal")
+    monkeypatch.setenv("PORTAL_B_JUSTIFICATION", "Justificativa local")
+    cfg = PortalBConfig()
+    assert cfg.target_url == "https://example.test/portal"
+    assert cfg.justification == "Justificativa local"
