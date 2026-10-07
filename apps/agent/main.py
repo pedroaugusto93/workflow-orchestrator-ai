@@ -29,10 +29,11 @@ def run() -> None:
         settings.connector_package,
         development=settings.app_env == "development",
     )
+    remote_mode = bool(settings.agent_api_url.strip())
     orchestrator = Orchestrator(
         repo,
         connectors,
-        approval_required=settings.approval_required,
+        approval_required=True if remote_mode else settings.approval_required,
         allow_force_reprocess=settings.allow_force_reprocess,
     )
     agent_id = socket.gethostname()
