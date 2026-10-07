@@ -2,7 +2,7 @@
 
 Arquitetura aberta e desacoplada para orquestrar automações de processos em múltiplos portais, com painel web responsivo, agente local e execução segura por etapas.
 
-> Este repositório **não contém dados reais, nomes institucionais, URLs operacionais, credenciais, certificados, planilhas de produção nem seletores privados**. Os conectores de produção são carregados externamente por configuração/plug-in local.
+> O código dos conectores faz parte do projeto público. Dados reais, nome da organização, URLs operacionais, credenciais, certificados, planilhas de produção e configurações locais ficam fora do Git.
 
 ## Objetivos
 
@@ -10,10 +10,10 @@ Arquitetura aberta e desacoplada para orquestrar automações de processos em m�
 - Preservar os projetos legados de produção sem qualquer alteração.
 - Separar domínio, orquestração, persistência, navegador, conectores e interface web.
 - Evitar duplicidade com idempotência e estado persistente por etapa.
-- Permitir retomada após falhas sem repetir etapas irreversíveis.
-- Exigir aprovação antes de ações irreversíveis quando configurado.
-- Permitir operação pelo celular através de um painel web, mantendo navegador/certificado no agente Windows.
-- Deixar o GitHub público sem expor a organização ou dados operacionais.
+- Permitir retomada após falhas sem depender de percentuais gravados em planilha.
+- Exigir aprovação antes de ações irreversíveis.
+- Permitir operação pelo celular através de painel web, mantendo navegador/certificado no agente Windows.
+- Manter o repositório público sem expor dados ou configuração institucional.
 
 ## Arquitetura
 
@@ -35,27 +35,7 @@ Celular / navegador
                       + regras + IA assistiva
 ```
 
-A IA **não controla o DOM diretamente** em produção. Ela pode classificar, conferir, extrair e sugerir; a execução permanece em workflows determinísticos com guardas, idempotência e auditoria.
-
-## Começar localmente
-
-```bash
-python -m venv .venv
-# Windows: .venv\\Scripts\\activate
-# Linux/macOS: source .venv/bin/activate
-pip install -e ".[dev]"
-copy .env.example .env   # Windows
-# cp .env.example .env  # Linux/macOS
-python -m apps.api.main
-```
-
-Em outro terminal:
-
-```bash
-python -m apps.agent.main
-```
-
-Acesse `http://127.0.0.1:8000`.
+A IA não controla o DOM livremente em produção. Ela pode classificar, conferir, extrair e sugerir; a execução dos portais continua em workflows determinísticos, com idempotência, retomada e aprovação para ações irreversíveis.
 
 ## Estrutura
 
@@ -65,14 +45,62 @@ apps/
   agent/                # executor local/Windows
 src/workflow_ai/
   domain/               # entidades e regras puras
-  application/          # casos de uso e orquestração
-  ports/                 # contratos (interfaces)
-  infrastructure/       # SQLite, Selenium, configurações
-  connectors/           # interfaces neutras dos portais
-  ai/                   # IA assistiva, nunca executor irrestrito
-config/                  # somente exemplos públicos
-private_connectors/      # ignorado pelo git; implementação operacional local
-data/ logs/ artifacts/  # ignorados
+  application/          # workflows e orquestração
+  ports/                 # interfaces
+  infrastructure/       # SQLite, Selenium e settings
+  connectors/
+    portal_a/           # conector público do fluxo A
+    portal_b/           # conector público do fluxo B
+  ai/                   # política da IA assistiva
+scripts/
+  import_excel.py       # transforma planilha em jobs
+  run_agent.ps1
+  security_scan.py
+data/ logs/ artifacts/  # runtime, ignorados pelo Git
 ```
 
-Leia `docs/ARCHITECTURE.md` e `docs/MIGRATION.md` antes de portar os conectores legados.
+## Instalação local
+
+SQLite não precisa ser instalado separadamente; o Python já fornece o módulo `sqlite3`.
+
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+pip install -e ".[dev]"
+copy .env.example .env
+```
+
+Configure o `.env` somente na máquina do agente. Não envie esse arquivo ao GitHub.
+
+## Importar a planilha para a fila
+
+Fluxo A mantém uma execução por registro:
+
+```bash
+python scripts/import_excel.py cadastro.xlsx --workflow portal_a_submission
+```
+
+Fluxo B agrupa automaticamente todas as linhas do mesmo processo em um único job com vários itens:
+
+```bash
+python scripts/import_excel.py cadastro.xlsx --workflow portal_b_publication
+```
+
+## Executar
+
+Painel/API:
+
+```bash
+python -m apps.api.main
+```
+
+Agente local, em outro terminal:
+
+```bash
+python -m apps.agent.main
+```
+
+Acesse `http://127.0.0.1:8000`.
+
+Consulte também `docs/ARCHITECTURE.md`, `docs/REFACTOR_STATUS.md` e `docs/SECURITY.md`.
