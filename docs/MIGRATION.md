@@ -1,50 +1,68 @@
-# Plano de migração dos dois projetos legados
+# Reescrita dos dois projetos legados
 
-Os repositórios de produção permanecem independentes e intocados. A migração é por
-**cópia controlada e reescrita**, nunca por importação deles em runtime.
+Os projetos anteriores permanecem independentes e intocados. Eles são tratados como
+**especificação funcional**: comportamento, validações e seletores úteis são estudados,
+mas o runtime novo não importa módulos dos projetos antigos.
 
-## Mapeamento do legado A
+## Princípio
 
-| Legado | Destino novo |
+Não é uma migração de arquivos para novas pastas. Cada responsabilidade antiga é
+reimplementada na arquitetura nova:
+
+- planilha -> importador de dados;
+- JSON/percentuais -> `JobRepository`/SQLite;
+- `main.py` monolítico -> `Orchestrator` + workflows;
+- helpers Selenium espalhados -> `BrowserPort` + `SeleniumBrowser`;
+- páginas antigas -> steps dos conectores;
+- envio/publicação -> etapa irreversível com approval gate.
+
+## Fluxo A
+
+| Responsabilidade antiga | Implementação nova |
 |---|---|
-| `main.py` | `application/workflows.py` + conector privado |
-| `config.py` | `.env` + arquivo TOML privado |
-| `state.py` | `infrastructure/sqlite_repo.py` |
-| `planilha_status.py` | estado persistente + exportador opcional |
-| `page_dados_basicos.py` | etapa `basic_data` do Portal A |
-| `page_itens.py` | etapa `items` |
-| `page_documentos.py` | etapa `documents` |
-| `page_empenhos.py` | etapa `commitments` |
-| `verify.py` | etapa `verify` |
-| `page_enviar.py` | etapa irreversível `submit` |
-| recibos/PDF | `artifacts/` fora do Git |
+| orquestração do `main.py` | `application/orchestrator.py` + workflow A |
+| estado/retomada | SQLite / `job_steps` |
+| dados básicos | `connectors/portal_a/steps.py::basic_data` |
+| itens | `items` |
+| documentos | `documents` |
+| empenhos | `commitments` |
+| conferência | `verify` |
+| envio | `submit` com aprovação |
+| recibos | `artifacts/` fora do Git |
 
-## Mapeamento do legado B
+## Fluxo B
 
-| Legado | Destino novo |
+| Responsabilidade antiga | Implementação nova |
 |---|---|
-| `main.py` | `application/workflows.py` |
-| `models.py` | `domain/models.py` |
-| `helpers.py` | `importers/excel.py` |
-| `pncp_status.py` | SQLite + idempotência por etapa |
-| `driver.py` | `infrastructure/browser.py` |
-| `app_selectors.py` | configuração privada do Portal B |
-| `page_localizar_processo.py` | etapa `locate` |
-| `page_dados_basicos.py` | etapa `basic_data` |
-| `page_dados_adicionais.py` | etapa `additional_data` |
-| `page_itens.py` | etapa `items` |
-| `page_anexos.py` | etapa `attachments` |
-| `page_responsaveis.py` | etapa `responsibles` |
-| `page_publicacao.py` | etapa irreversível `publish` |
+| agrupamento por processo | `CaseRecord.items` + `ContractLineItem` |
+| pré-cadastro | `initial_data` com busca antes de criar |
+| localizar/reabrir | `locate` / `ensure_edit_context` |
+| dados básicos | `basic_data` |
+| dados adicionais | `additional_data` |
+| itens/local/resultado | `items` |
+| anexos | `attachments` |
+| responsáveis | `responsibles` |
+| publicação | `publish` com aprovação |
+| status percentual da planilha | eliminado do runtime; estado fica no SQLite |
 
-## Ordem recomendada de portabilidade
+## Código público e configuração privada
 
-1. Copiar as funções Selenium do legado para `private_connectors/` sem alterar lógica.
-2. Adaptar assinatura para `run_step(step_name, record)`.
-3. Substituir acesso direto à planilha por `CaseRecord`.
-4. Substituir status em Excel/JSON por `JobRepository`.
-5. Colocar envio/publicação atrás de approval gate.
-6. Rodar primeiro em modo de leitura/dry-run.
-7. Comparar resultados com os projetos atuais antes de ativar ações irreversíveis.
+Os conectores canônicos ficam em `src/workflow_ai/connectors/portal_a` e
+`portal_b`. URLs reais, justificativas institucionais, códigos locais, credenciais,
+certificados e dados ficam em `.env` ou no ambiente do agente e não são commitados.
 
-A arquitetura nova deve poder rodar lado a lado com os legados até a homologação completa.
+`private_connectors/` permanece apenas como mecanismo **opcional de override** para
+um ambiente que precise substituir um conector público sem alterar o repositório.
+
+## Homologação
+
+A reescrita estrutural não equivale a homologação Selenium. Antes de substituir os
+robôs de produção:
+
+1. executar em ambiente autenticado;
+2. validar cada step isoladamente;
+3. interromper e retomar jobs em pontos diferentes;
+4. confirmar anti-duplicidade;
+5. comparar os registros gerados com os robôs atuais;
+6. testar ações irreversíveis somente com aprovação explícita;
+7. só então descontinuar o legado.
