@@ -18,6 +18,7 @@ class JobStatus(StrEnum):
     CLAIMED = "claimed"
     RUNNING = "running"
     WAITING_APPROVAL = "waiting_approval"
+    NEEDS_REVIEW = "needs_review"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -30,6 +31,7 @@ class StepStatus(StrEnum):
     FAILED = "failed"
     SKIPPED = "skipped"
     WAITING_APPROVAL = "waiting_approval"
+    UNCERTAIN = "uncertain"
 
 
 @dataclass(slots=True)
