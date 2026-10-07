@@ -204,6 +204,26 @@ class PortalBSteps:
                 ok=False,
                 message=f"Após inclusão, cards={len(card_ids)} esperado={len(items)}.",
             )
+
+        if self.config.catalog_code:
+            mismatches = self.browser.execute_script(
+                """
+                const [ids, expected] = arguments;
+                return ids.map(id => {
+                  const el = document.getElementById('codigo-pdm-item-' + id);
+                  return {id, code: (el?.innerText || '').trim()};
+                }).filter(row => row.code && row.code !== expected);
+                """,
+                card_ids,
+                self.config.catalog_code,
+            ) or []
+            if mismatches:
+                return StepResult(
+                    ok=False,
+                    message="Código do item na tela difere do catálogo configurado.",
+                    metadata={"mismatches": mismatches},
+                )
+
         self._fill_delivery(card_ids)
         self._fill_results(card_ids, items)
         return StepResult(ok=True, message=f"{len(items)} item(ns) concluído(s).")
