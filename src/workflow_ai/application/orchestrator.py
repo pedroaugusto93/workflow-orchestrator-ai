@@ -113,6 +113,44 @@ class Orchestrator:
         self.repo.update(job)
         return job
 
+    def resolve_review(self, job_id: str, *, completed: bool) -> Job:
+        job = self.repo.get(job_id)
+        if not job:
+            raise ValueError("Job não encontrado.")
+        if job.status != JobStatus.NEEDS_REVIEW:
+            raise ValueError("Job não está aguardando revisão humana.")
+
+        irreversible = next(
+            (
+                step
+                for step in WORKFLOWS[job.workflow]
+                if step.name == job.current_step and step.irreversible
+            ),
+            None,
+        )
+        if irreversible is None:
+            raise ValueError("Step em revisão não é uma ação irreversível conhecida.")
+
+        if completed:
+            self.repo.record_step(
+                job.id,
+                job.current_step,
+                StepStatus.SUCCEEDED,
+                "Conclusão confirmada manualmente após reconciliação.",
+            )
+            job.status = JobStatus.SUCCEEDED
+            job.current_step = ""
+            job.error = ""
+        else:
+            job.status = JobStatus.QUEUED
+            job.approved = False
+            job.current_step = ""
+            job.error = ""
+
+        self._touch(job)
+        self.repo.update(job)
+        return job
+
     def _mark_step_failure(
         self,
         job: Job,
