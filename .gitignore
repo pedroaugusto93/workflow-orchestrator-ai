@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+*.pem
+*.pfx
+*.p12
+*.key
+
+# Operational connector packs
+private_connectors/*
+!private_connectors/README.example.md
+config/portal_a.toml
+config/portal_b.toml
+config/forbidden_terms.txt
+
+# Data and artifacts
+/data/*
+!/data/.gitkeep
+/logs/*
+!/logs/.gitkeep
+/artifacts/*
+!/artifacts/.gitkeep
+/receipts/
+/recibos/
+/shots/
+*.xlsx
+*.xls
+*.csv
+*.pdf
+*.docx
+*.html
+*.png
+*.jpg
+*.jpeg
+
+# DB
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

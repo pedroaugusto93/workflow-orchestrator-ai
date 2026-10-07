@@ -1,0 +1,9 @@
+[portal]
+base_url = "https://example.invalid"
+
+[browser]
+debug_host = "127.0.0.1"
+debug_port = 9222
+
+[selectors]
+# Mantenha seletores operacionais no arquivo privado ignorado pelo Git.
