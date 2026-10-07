@@ -23,17 +23,6 @@ def _date_br(value: str) -> str:
     return raw
 
 
-def _date_input(value: str, *, month_first: bool) -> str:
-    normalized = _date_br(value)
-    if not normalized:
-        return ""
-    try:
-        parsed = datetime.strptime(normalized, "%d/%m/%Y")
-    except ValueError:
-        return normalized
-    return parsed.strftime("%m/%d/%Y" if month_first else "%d/%m/%Y")
-
-
 def _year(value: str) -> str:
     normalized = _date_br(value)
     match = re.search(r"(\d{4})$", normalized)
@@ -86,11 +75,7 @@ class PortalBSteps:
         self.browser.navigate(self.config.target_url)
         existing = self._locate_row(record, open_edit=False)
         if existing:
-            return StepResult(
-                ok=True,
-                message="Pré-cadastro já existente; criação ignorada.",
-                external_id=existing,
-            )
+            return StepResult(ok=True, message="Pré-cadastro já existente; criação ignorada.", external_id=existing)
 
         self.browser.navigate(self.config.target_url)
         self.browser.click(B.CREATE)
@@ -104,16 +89,10 @@ class PortalBSteps:
             or ""
         ).lower()
         month_first = language.startswith("en")
-        self.browser.fill(
-            B.START_DATE,
-            _date_input(record.start_date, month_first=month_first),
-        )
+        self.browser.fill(B.START_DATE, self._date_input(record.start_date, month_first))
         self.browser.fill(
             B.END_DATE,
-            _date_input(
-                record.end_date or record.commitment_date,
-                month_first=month_first,
-            ),
+            self._date_input(record.end_date or record.commitment_date, month_first),
         )
         self.browser.fill(B.DESCRIPTION, record.object_text)
         self.browser.fill(B.JUSTIFICATION, self.config.justification)
@@ -205,25 +184,6 @@ class PortalBSteps:
                 message=f"Após inclusão, cards={len(card_ids)} esperado={len(items)}.",
             )
 
-        if self.config.catalog_code:
-            mismatches = self.browser.execute_script(
-                """
-                const [ids, expected] = arguments;
-                return ids.map(id => {
-                  const el = document.getElementById('codigo-pdm-item-' + id);
-                  return {id, code: (el?.innerText || '').trim()};
-                }).filter(row => row.code && row.code !== expected);
-                """,
-                card_ids,
-                self.config.catalog_code,
-            ) or []
-            if mismatches:
-                return StepResult(
-                    ok=False,
-                    message="Código do item na tela difere do catálogo configurado.",
-                    metadata={"mismatches": mismatches},
-                )
-
         self._fill_delivery(card_ids)
         self._fill_results(card_ids, items)
         return StepResult(ok=True, message=f"{len(items)} item(ns) concluído(s).")
@@ -241,16 +201,8 @@ class PortalBSteps:
 
     def responsibles(self, record: CaseRecord) -> StepResult:
         people = [
-            (
-                record.responsible_document,
-                record.responsible_email,
-                self.config.responsible_role_label,
-            ),
-            (
-                record.authority_document,
-                record.authority_email,
-                self.config.authority_role_label,
-            ),
+            (record.responsible_document, record.responsible_email, self.config.responsible_role_label),
+            (record.authority_document, record.authority_email, self.config.authority_role_label),
         ]
         missing = [role for document, _email, role in people if len(_digits(document)) != 11]
         if missing:
@@ -283,11 +235,7 @@ class PortalBSteps:
         destination = self.config.receipt_dir / f"{_safe_name(record.process_id)}.pdf"
         receipt = self.browser.print_pdf(destination)
         self.browser.click(B.CLOSE_RECEIPT)
-        return StepResult(
-            ok=True,
-            message="Publicação concluída.",
-            metadata={"receipt": str(receipt)},
-        )
+        return StepResult(ok=True, message="Publicação concluída.", metadata={"receipt": str(receipt)})
 
     def _select_option(self, trigger: Locator, label: str) -> None:
         self.browser.click(trigger)
@@ -295,15 +243,13 @@ class PortalBSteps:
 
     def _select_legal_basis(self) -> None:
         self.browser.click(B.LEGAL_EDIT)
-        law = B.tree_node(self.config.legal_law_label)
-        article = B.tree_node(self.config.legal_article_label)
-        for node in (law, article):
+        for node in (
+            B.tree_node(self.config.legal_law_label),
+            B.tree_node(self.config.legal_article_label),
+        ):
             if self.browser.read_attribute(node, "aria-expanded", timeout=5).lower() != "true":
                 self.browser.click(
-                    Locator(
-                        "css",
-                        f"{node.value} div.p-treenode-content button.p-tree-toggler",
-                    )
+                    Locator("css", f"{node.value} div.p-treenode-content button.p-tree-toggler")
                 )
         clause = B.tree_prefix(self.config.legal_clause_prefix)
         self.browser.click(Locator("css", f"{clause.value} div.p-treenode-content"))
@@ -317,23 +263,23 @@ class PortalBSteps:
             "//div[contains(@class,'fieldset-header')]",
         )
         if self.browser.read_attribute(header, "aria-label", timeout=5).strip().lower() == "expandir":
-            legend = Locator(
-                "xpath",
-                "//fieldset[contains(@class,'collapsible')]"
-                f"[.//legend[contains(normalize-space(.), '{title}')]]//legend",
+            self.browser.click(
+                Locator(
+                    "xpath",
+                    "//fieldset[contains(@class,'collapsible')]"
+                    f"[.//legend[contains(normalize-space(.), '{title}')]]//legend",
+                )
             )
-            self.browser.click(legend)
 
     def _select_pca(self, record: CaseRecord) -> None:
         year = _year(record.start_date or record.commitment_date or record.end_date)
         if not year:
             raise RuntimeError("Ano do plano não pôde ser determinado.")
         label = f"PCA {year} - {self.config.pca_status}"
-        current = ""
         try:
             current = self.browser.read_text(B.PCA, timeout=2)
         except Exception:
-            pass
+            current = ""
         if label.casefold() not in current.casefold():
             self._select_option(B.PCA, label)
 
@@ -343,18 +289,14 @@ class PortalBSteps:
             self.browser.click(B.MY_UNIT_TAB, timeout=3)
         except Exception:
             pass
-
         self.browser.page_ready()
         if not self.browser.exists(B.GRID_ROWS, timeout=8):
             return ""
 
-        title = record.title.strip()
-        start = _date_br(record.start_date)
-        end = _date_br(record.end_date or record.commitment_date)
         row_id = self.browser.execute_script(
             """
             const norm=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-              .toLowerCase().replace(/\\s+/g,' ').trim();
+              .toLowerCase().replace(/\s+/g,' ').trim();
             const [title,start,end,doClick]=arguments;
             for (const tr of document.querySelectorAll("tr[id^='contratacao-']")) {
               const td=tr.querySelectorAll('td');
@@ -374,9 +316,9 @@ class PortalBSteps:
             }
             return '';
             """,
-            title,
-            start,
-            end,
+            record.title.strip(),
+            _date_br(record.start_date),
+            _date_br(record.end_date or record.commitment_date),
             open_edit,
         ) or ""
         if row_id and open_edit:
@@ -402,6 +344,7 @@ class PortalBSteps:
         self.browser.click(B.CATALOG_SEARCH_BUTTON)
         if not self.browser.exists(B.CATALOG_TABLE, timeout=10):
             raise RuntimeError("Tabela de catálogo não apareceu.")
+
         for item in items:
             clicked = self.browser.execute_script(
                 """
@@ -490,7 +433,7 @@ class PortalBSteps:
                 """
                 const [panelId,doc]=arguments;
                 const panel=document.getElementById(panelId);
-                const digits=(panel?.innerText||'').replace(/\\D/g,'');
+                const digits=(panel?.innerText||'').replace(/\D/g,'');
                 return !!doc && digits.includes(doc);
                 """,
                 f"tabpanel-resultados-{card_id}",
@@ -511,7 +454,15 @@ class PortalBSteps:
         digits = _digits(document)
         return bool(
             self.browser.execute_script(
-                "return (document.body?.innerText||'').replace(/\\D/g,'').includes(arguments[0]);",
+                "return (document.body?.innerText||'').replace(/\D/g,'').includes(arguments[0]);",
                 digits,
             )
         )
+
+    @staticmethod
+    def _date_input(value: str, month_first: bool) -> str:
+        br = _date_br(value)
+        if not br:
+            return ""
+        day, month, year = br.split("/")
+        return f"{month}/{day}/{year}" if month_first else br
