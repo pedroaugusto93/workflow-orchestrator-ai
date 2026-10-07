@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Workflow Orchestrator</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">AUTOMAÇÃO SEGURA</p>
+        <h1>Workflow Orchestrator</h1>
+        <p class="muted">Fila, retomada por etapa e aprovação de ações irreversíveis.</p>
+      </div>
+      <span class="pill">noindex</span>
+    </header>
+
+    <section class="card">
+      <h2>Novo processo</h2>
+      <form method="post" action="/jobs" class="grid">
+        <label>Processo<input name="process_id" required></label>
+        <label>Fluxo<select name="workflow">{% for w in workflows %}<option value="{{ w.value }}">{{ w.value }}</option>{% endfor %}</select></label>
+        <label>Título<input name="title"></label>
+        <label>Documento do fornecedor<input name="supplier_document"></label>
+        <label>Nº do empenho<input name="commitment_number"></label>
+        <button type="submit">Adicionar à fila</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="section-title"><h2>Execuções</h2><span>{{ jobs|length }}</span></div>
+      <div class="jobs">
+        {% for job in jobs %}
+        <article class="job">
+          <div class="job-main">
+            <strong>{{ job.payload.process_id }}</strong>
+            <span>{{ job.workflow.value }}</span>
+            <small>{{ job.current_step or '—' }}</small>
+          </div>
+          <div class="job-side">
+            <span class="status status-{{ job.status.value }}">{{ job.status.value }}</span>
+            {% if job.status.value == 'waiting_approval' %}
+            <form method="post" action="/jobs/{{ job.id }}/approve"><button class="secondary">Aprovar</button></form>
+            {% endif %}
+          </div>
+          {% if job.error %}<p class="error">{{ job.error }}</p>{% endif %}
+        </article>
+        {% else %}
+        <p class="muted">Nenhum job ainda.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+</body>
+</html>

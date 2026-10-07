@@ -39,6 +39,7 @@ config/forbidden_terms.txt
 *.pdf
 *.docx
 *.html
+!apps/api/templates/*.html
 *.png
 *.jpg
 *.jpeg
