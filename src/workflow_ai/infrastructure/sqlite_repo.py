@@ -148,7 +148,7 @@ class SQLiteJobRepository:
 
     def approve(self, job_id: str) -> Job | None:
         job = self.get(job_id)
-        if not job:
+        if not job or job.status != JobStatus.WAITING_APPROVAL:
             return None
         job.approved = True
         job.status = JobStatus.QUEUED
