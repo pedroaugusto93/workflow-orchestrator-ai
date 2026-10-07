@@ -29,3 +29,23 @@ def test_connector_builds_with_slots():
 
     connector = PortalAConnector(Browser(), PortalAConfig())
     assert connector.steps is not None
+
+
+def test_lost_context_fails_safe():
+    from workflow_ai.connectors.portal_a.connector import PortalAConnector
+    from workflow_ai.domain.models import Job, WorkflowKind
+
+    class Browser:
+        def exists(self, *args, **kwargs):
+            return False
+
+    connector = PortalAConnector(Browser(), PortalAConfig(search_url=""))
+    job = Job(
+        workflow=WorkflowKind.PORTAL_A_SUBMISSION,
+        payload=CaseRecord(process_id="P1"),
+        external_id="EXT-1",
+    )
+    result = connector.run_step("items", job)
+
+    assert not result.ok
+    assert "não pôde ser restaurado" in result.message
