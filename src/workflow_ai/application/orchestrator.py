@@ -38,6 +38,7 @@ class Orchestrator:
                 JobStatus.CLAIMED,
                 JobStatus.RUNNING,
                 JobStatus.WAITING_APPROVAL,
+                JobStatus.NEEDS_REVIEW,
             }
             if active or not (force and self.allow_force_reprocess):
                 raise DuplicateJobError(
@@ -83,20 +84,20 @@ class Orchestrator:
             try:
                 result = connector.run_step(step.name, job)
             except Exception as exc:
-                job.status = JobStatus.FAILED
-                job.error = f"{type(exc).__name__}: {exc}"
-                self.repo.record_step(job.id, step.name, StepStatus.FAILED, job.error)
-                self._touch(job)
-                self.repo.update(job)
-                return job
+                return self._mark_step_failure(
+                    job,
+                    step.name,
+                    f"{type(exc).__name__}: {exc}",
+                    irreversible=step.irreversible,
+                )
 
             if not result.ok:
-                job.status = JobStatus.FAILED
-                job.error = result.message or f"Falha na etapa {step.name}"
-                self.repo.record_step(job.id, step.name, StepStatus.FAILED, job.error)
-                self._touch(job)
-                self.repo.update(job)
-                return job
+                return self._mark_step_failure(
+                    job,
+                    step.name,
+                    result.message or f"Falha na etapa {step.name}",
+                    irreversible=step.irreversible,
+                )
 
             if result.external_id:
                 job.external_id = result.external_id
@@ -108,6 +109,36 @@ class Orchestrator:
         job.status = JobStatus.SUCCEEDED
         job.current_step = ""
         job.error = ""
+        self._touch(job)
+        self.repo.update(job)
+        return job
+
+    def _mark_step_failure(
+        self,
+        job: Job,
+        step_name: str,
+        message: str,
+        *,
+        irreversible: bool,
+    ) -> Job:
+        if irreversible:
+            job.status = JobStatus.NEEDS_REVIEW
+            step_status = StepStatus.UNCERTAIN
+            job.error = (
+                "Resultado de ação irreversível precisa de revisão humana: "
+                + message
+            )
+        else:
+            job.status = JobStatus.FAILED
+            step_status = StepStatus.FAILED
+            job.error = message
+
+        self.repo.record_step(
+            job.id,
+            step_name,
+            step_status,
+            job.error,
+        )
         self._touch(job)
         self.repo.update(job)
         return job
