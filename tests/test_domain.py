@@ -14,3 +14,22 @@ def test_workflows_have_different_keys():
     assert r.idempotency_key(WorkflowKind.PORTAL_A_SUBMISSION) != r.idempotency_key(
         WorkflowKind.PORTAL_B_PUBLICATION
     )
+
+
+from workflow_ai.domain.models import ContractLineItem
+
+
+def test_portal_b_idempotency_is_process_level():
+    a = CaseRecord(
+        process_id="P-001",
+        supplier_document="111",
+        items=[ContractLineItem(supplier_document="111", value="10")],
+    )
+    b = CaseRecord(
+        process_id="P001",
+        supplier_document="999",
+        items=[ContractLineItem(supplier_document="999", value="20")],
+    )
+    assert a.idempotency_key(WorkflowKind.PORTAL_B_PUBLICATION) == b.idempotency_key(
+        WorkflowKind.PORTAL_B_PUBLICATION
+    )
