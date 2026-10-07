@@ -22,6 +22,7 @@ WORKFLOWS: dict[WorkflowKind, tuple[WorkflowStep, ...]] = {
         WorkflowStep("submit", irreversible=True),
     ),
     WorkflowKind.PORTAL_B_PUBLICATION: (
+        WorkflowStep("initial_data"),
         WorkflowStep("locate"),
         WorkflowStep("basic_data"),
         WorkflowStep("additional_data"),
