@@ -4,22 +4,40 @@
 
 Reimplementado na nova arquitetura:
 
-- preparação de contexto;
+- preparação e retomada de contexto;
 - dados básicos;
 - itens;
 - documentos;
 - empenhos;
 - conferência pós-gravação;
 - envio irreversível protegido pelo approval gate;
-- geração de recibo por PDF via navegador;
-- estado e retomada controlados pelo `JobRepository`, não pela planilha.
+- geração de recibo em PDF;
+- estado por etapa no SQLite.
 
-A etapa de retomada já recebe o `external_id` do job. A abertura automática de um registro existente a partir da tela de consulta ainda precisa de validação no portal real antes de ser considerada homologada.
+A homologação final dos seletores e da retomada exige execução no portal real a partir do agente Windows.
 
 ## Fluxo B
 
-Ainda usa apenas o workflow abstrato/demo. A próxima fase é reconstruir suas etapas sobre a mesma `BrowserPort`.
+Reimplementado estruturalmente na nova arquitetura:
 
-## Regra
+- pré-cadastro com prevenção de duplicidade;
+- localização e reabertura da contratação;
+- dados básicos;
+- dados adicionais;
+- múltiplos itens por processo;
+- local de entrega;
+- resultado individual por fornecedor;
+- anexos;
+- responsáveis;
+- publicação irreversível protegida pelo approval gate;
+- geração de recibo em PDF.
 
-Nenhum módulo em `src/` pode importar código de `legacy/`.
+O domínio agora trata processo como agregado e os itens como filhos tipados. O SQLite persiste a coleção de itens; a planilha deixou de ser a máquina de estados.
+
+## O que ainda depende do PC
+
+Os dois conectores precisam de homologação contra os portais reais porque Selenium depende do DOM efetivamente carregado, da sessão autenticada, de certificado quando aplicável e do comportamento do navegador.
+
+## Regra arquitetural
+
+Nenhum módulo em `src/` importa código de `legacy/`. Os projetos anteriores são apenas especificação funcional durante a reescrita.
