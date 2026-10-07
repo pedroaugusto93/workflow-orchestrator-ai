@@ -13,6 +13,7 @@ class WorkflowStep:
 
 WORKFLOWS: dict[WorkflowKind, tuple[WorkflowStep, ...]] = {
     WorkflowKind.PORTAL_A_SUBMISSION: (
+        WorkflowStep("prepare"),
         WorkflowStep("basic_data"),
         WorkflowStep("items"),
         WorkflowStep("documents"),

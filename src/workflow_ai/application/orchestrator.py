@@ -73,7 +73,7 @@ class Orchestrator:
             self.repo.update(job)
 
             try:
-                result = connector.run_step(step.name, job.payload)
+                result = connector.run_step(step.name, job)
             except Exception as exc:
                 job.status = JobStatus.FAILED
                 job.error = f"{type(exc).__name__}: {exc}"

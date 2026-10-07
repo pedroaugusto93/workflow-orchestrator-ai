@@ -44,8 +44,12 @@ class CaseRecord:
     start_date: str = ""
     end_date: str = ""
     commitment_year: str = ""
+    commitment_date: str = ""
     commitment_number: str = ""
     commitment_value: str = ""
+    commitment_unit_code: str = ""
+    item_number: str = "1"
+    quantity: str = "1"
     source_link: str = ""
     file_path: str = ""
     responsible_document: str = ""
@@ -55,6 +59,7 @@ class CaseRecord:
     authority_email: str = ""
     act_date: str = ""
     ordering_officer: str = ""
+    ordering_officer_document: str = ""
     extras: dict[str, Any] = field(default_factory=dict)
 
     def idempotency_key(self, workflow: WorkflowKind) -> str:

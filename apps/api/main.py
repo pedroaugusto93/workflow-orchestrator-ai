@@ -13,7 +13,6 @@ from pydantic import BaseModel
 
 from workflow_ai.application.orchestrator import DuplicateJobError, Orchestrator
 from workflow_ai.domain.models import CaseRecord, Job, JobStatus, WorkflowKind
-from workflow_ai.infrastructure.connectors import build_connector_registry
 from workflow_ai.infrastructure.settings import settings
 from workflow_ai.infrastructure.sqlite_repo import SQLiteJobRepository
 
@@ -24,12 +23,9 @@ templates = Jinja2Templates(directory=BASE / "templates")
 security = HTTPBasic()
 
 repo = SQLiteJobRepository(settings.database_url.removeprefix("sqlite:///"))
-connectors = build_connector_registry(
-    settings.connector_package, development=settings.app_env == "development"
-)
 orchestrator = Orchestrator(
     repo,
-    connectors,
+    {},
     approval_required=settings.approval_required,
     allow_force_reprocess=settings.allow_force_reprocess,
 )
