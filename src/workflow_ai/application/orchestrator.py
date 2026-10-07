@@ -31,11 +31,19 @@ class Orchestrator:
         self.allow_force_reprocess = allow_force_reprocess
 
     def enqueue(self, job: Job, *, force: bool = False) -> Job:
-        previous = self.repo.find_completed_by_idempotency(job.idempotency_key)
-        if previous and not (force and self.allow_force_reprocess):
-            raise DuplicateJobError(
-                f"Registro já concluído por idempotência: {previous.id}"
-            )
+        previous = self.repo.find_existing_by_idempotency(job.idempotency_key)
+        if previous:
+            active = previous.status in {
+                JobStatus.QUEUED,
+                JobStatus.CLAIMED,
+                JobStatus.RUNNING,
+                JobStatus.WAITING_APPROVAL,
+            }
+            if active or not (force and self.allow_force_reprocess):
+                raise DuplicateJobError(
+                    "Job equivalente já existe: "
+                    f"{previous.id} ({previous.status.value})"
+                )
         return self.repo.create(job)
 
     def execute(self, job: Job) -> Job:
