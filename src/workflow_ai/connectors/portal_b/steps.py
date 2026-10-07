@@ -343,6 +343,11 @@ class PortalBSteps:
             self.browser.click(B.MY_UNIT_TAB, timeout=3)
         except Exception:
             pass
+
+        self.browser.page_ready()
+        if not self.browser.exists(B.GRID_ROWS, timeout=8):
+            return ""
+
         title = record.title.strip()
         start = _date_br(record.start_date)
         end = _date_br(record.end_date or record.commitment_date)
