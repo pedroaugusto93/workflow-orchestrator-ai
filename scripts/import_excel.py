@@ -61,7 +61,7 @@ def main() -> int:
             print(f"ENFILEIRADO | {record.process_id}")
         except DuplicateJobError:
             duplicates += 1
-            print(f"IGNORADO (já concluído) | {record.process_id}")
+            print(f"IGNORADO (job equivalente já existe) | {record.process_id}")
 
     print(
         f"Resumo: {created} job(s) enfileirado(s), "
