@@ -301,7 +301,7 @@ class PortalBSteps:
         row_id = self.browser.execute_script(
             """
             const norm=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-              .toLowerCase().replace(/\s+/g,' ').trim();
+              .toLowerCase().replace(/\\s+/g,' ').trim();
             const [title,start,end,doClick]=arguments;
             for (const tr of document.querySelectorAll("tr[id^='contratacao-']")) {
               const td=tr.querySelectorAll('td');
@@ -437,7 +437,7 @@ class PortalBSteps:
                 """
                 const [panelId,doc]=arguments;
                 const panel=document.getElementById(panelId);
-                const digits=(panel?.innerText||'').replace(/\D/g,'');
+                const digits=(panel?.innerText||'').replace(/\\D/g,'');
                 return !!doc && digits.includes(doc);
                 """,
                 f"tabpanel-resultados-{card_id}",
@@ -458,7 +458,7 @@ class PortalBSteps:
         digits = _digits(document)
         return bool(
             self.browser.execute_script(
-                "return (document.body?.innerText||'').replace(/\D/g,'').includes(arguments[0]);",
+                "return (document.body?.innerText||'').replace(/\\D/g,'').includes(arguments[0]);",
                 digits,
             )
         )
