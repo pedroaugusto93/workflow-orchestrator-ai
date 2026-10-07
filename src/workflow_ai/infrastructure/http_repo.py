@@ -47,7 +47,7 @@ class HttpJobRepository:
     def list(self, limit: int = 100) -> list[Job]:
         raise NotImplementedError("Listagem administrativa pertence à API/painel.")
 
-    def find_completed_by_idempotency(self, key: str) -> Job | None:
+    def find_existing_by_idempotency(self, key: str) -> Job | None:
         raise NotImplementedError("Idempotência de enqueue pertence à API/painel.")
 
     def update(self, job: Job) -> None:
