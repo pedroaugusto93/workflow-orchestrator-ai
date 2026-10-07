@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from workflow_ai.connectors.portal_a.config import PortalAConfig
 from workflow_ai.connectors.portal_a.steps import PortalASteps
@@ -13,6 +13,7 @@ class PortalAConnector:
     browser: BrowserPort
     config: PortalAConfig
     kind: WorkflowKind = WorkflowKind.PORTAL_A_SUBMISSION
+    steps: PortalASteps = field(init=False)
 
     def __post_init__(self) -> None:
         self.steps = PortalASteps(self.browser, self.config)

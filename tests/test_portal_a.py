@@ -19,3 +19,13 @@ def test_document_required_fails_before_browser(tmp_path: Path):
     result = step.documents(CaseRecord(process_id="P1", file_path=""))
     assert not result.ok
     assert "obrigatório" in result.message
+
+
+def test_connector_builds_with_slots():
+    from workflow_ai.connectors.portal_a.connector import PortalAConnector
+
+    class Browser:
+        pass
+
+    connector = PortalAConnector(Browser(), PortalAConfig())
+    assert connector.steps is not None
